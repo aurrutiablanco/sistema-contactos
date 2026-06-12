@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administración</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        table { width: 100%; border-collapse: collapse; margin-top: 20px;}
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        .sidebar { float: left; width: 20%; background: #f4f4f4; padding: 15px; height: 100vh; }
+        .content { float: left; width: 75%; padding: 15px; }
+    </style>
+</head>
+<body>
+
+    <div id="loginSection">
+        <h2>Iniciar Sesión Administrador</h2>
+        <input type="email" id="loginEmail" placeholder="Correo">
+        <input type="password" id="loginPass" placeholder="Contraseña">
+        <button onclick="login()">Entrar</button>
+    </div>
+
+    <div id="dashboardSection" style="display: none;">
+        <div class="sidebar">
+            <h3>Menú</h3>
+            <ul>
+                <li><a href="#" onclick="cargarContactos()">Ver Contactos</a></li>
+                </ul>
+            <hr>
+            <h4>Mi Estado:</h4>
+            <select id="miEstado" onchange="cambiarEstado()">
+                <option value="true">Disponible</option>
+                <option value="false">No Disponible</option>
+            </select>
+            <br><br>
+            <button onclick="logout()">Cerrar Sesión</button>
+        </div>
+
+        <div class="content">
+            <h2>Tabla Maestra de Contactos</h2>
+            <table id="tablaContactos">
+                <thead>
+                    <tr>
+                        <th>Alias</th>
+                        <th>Teléfono</th>
+                        <th>Razón</th>
+                        <th>Motivo</th>
+                        <th>Fecha</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="cuerpoTabla"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let usuarioActual = null;
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPass').value;
+            
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: pass
+            });
+
+            if (error) alert("Error de credenciales");
+            else {
+                usuarioActual = data.user;
+                document.getElementById('loginSection').style.display = "none";
+                document.getElementById('dashboardSection').style.display = "block";
+                obtenerMiEstado();
+                cargarContactos();
+            }
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            location.reload();
+        }
+
+        async function obtenerMiEstado() {
+            const { data } = await supabase.from('perfiles').select('disponible').eq('id', usuarioActual.id).single();
+            if(data) document.getElementById('miEstado').value = data.disponible.toString();
+        }
+
+        async function cambiarEstado() {
+            const nuevoEstado = document.getElementById('miEstado').value === 'true';
+            await supabase.from('perfiles').update({ disponible: nuevoEstado }).eq('id', usuarioActual.id);
+            alert("Estado actualizado");
+        }
+
+        async function cargarContactos() {
+            const { data, error } = await supabase.from('contactos').select('*').order('created_at', { ascending: false });
+            const tbody = document.getElementById('cuerpoTabla');
+            tbody.innerHTML = "";
+
+            if (data) {
+                data.forEach(contacto => {
+                    const fila = `<tr>
+                        <td>${contacto.alias}</td>
+                        <td>${contacto.telefono}</td>
+                        <td>${contacto.razon}</td>
+                        <td>${contacto.motivo}</td>
+                        <td>${new Date(contacto.created_at).toLocaleDateString()}</td>
+                        <td><button onclick="borrarContacto(${contacto.id})">Borrar</button></td>
+                    </tr>`;
+                    tbody.innerHTML += fila;
+                });
+            }
+        }
+
+        async function borrarContacto(id) {
+            if(confirm("¿Seguro que deseas borrar este contacto?")) {
+                await supabase.from('contactos').delete().eq('id', id);
+                cargarContactos(); // Recargar la tabla
+            }
+        }
+    </script>
+</body>
+</html>
