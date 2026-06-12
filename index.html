@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Contacto Directo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+</head>
+<body>
+    <h2>Dejar un mensaje a un usuario</h2>
+    
+    <div>
+        <input type="text" id="buscarUsuario" placeholder="Ej: ArmandoCeoAdmin">
+        <button onclick="verificarUsuario()">Buscar Usuario</button>
+    </div>
+
+    <p id="estadoUsuario" style="font-weight: bold; margin-top: 10px;"></p>
+
+    <form id="formularioContacto" style="display: none; margin-top: 20px;">
+        <input type="hidden" id="perfil_id_oculto">
+        
+        <label>Alias (Max 20 carac.):</label><br>
+        <input type="text" id="alias" maxlength="20" required><br><br>
+
+        <label>Teléfono:</label><br>
+        <select id="codigoPais">
+            <option value="+58">+58 (VE)</option>
+            <option value="+57">+57 (CO)</option>
+            <option value="+1">+1 (US)</option>
+        </select>
+        <input type="number" id="numeroTlf" min="0" max="9999999999" placeholder="Máximo 10 números" required><br><br>
+
+        <label>Razón:</label><br>
+        <select id="razon">
+            <option value="Conocido">Conocido</option>
+            <option value="Quiero hacer negocios">Quiero hacer negocios</option>
+            <option value="Otro">Otro</option>
+        </select><br><br>
+
+        <label>Motivo del contacto:</label><br>
+        <textarea id="motivo" rows="4" required></textarea><br><br>
+
+        <button type="submit">Enviar Mensaje</button>
+    </form>
+
+    <script>
+        async function verificarUsuario() {
+            const username = document.getElementById('buscarUsuario').value;
+            const estadoTexto = document.getElementById('estadoUsuario');
+            const form = document.getElementById('formularioContacto');
+
+            // Buscamos al usuario en la base de datos
+            const { data, error } = await supabase
+                .from('perfiles')
+                .select('id, disponible')
+                .eq('username', username)
+                .single();
+
+            if (error || !data) {
+                estadoTexto.innerText = "Usuario no encontrado.";
+                estadoTexto.style.color = "red";
+                form.style.display = "none";
+                return;
+            }
+
+            if (!data.disponible) {
+                estadoTexto.innerText = `El usuario ${username} está actualmente NO DISPONIBLE.`;
+                estadoTexto.style.color = "orange";
+                form.style.display = "none";
+            } else {
+                estadoTexto.innerText = `Usuario ${username} encontrado. Puedes dejar tu mensaje.`;
+                estadoTexto.style.color = "green";
+                document.getElementById('perfil_id_oculto').value = data.id;
+                form.style.display = "block";
+            }
+        }
+
+        // Enviar el formulario
+        document.getElementById('formularioContacto').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const perfil_id = document.getElementById('perfil_id_oculto').value;
+            const telefonoCompleto = document.getElementById('codigoPais').value + " " + document.getElementById('numeroTlf').value;
+
+            const { error } = await supabase.from('contactos').insert([{
+                perfil_id: perfil_id,
+                alias: document.getElementById('alias').value,
+                telefono: telefonoCompleto,
+                razon: document.getElementById('razon').value,
+                motivo: document.getElementById('motivo').value
+            }]);
+
+            if (error) alert("Error: " + error.message);
+            else {
+                alert("¡Mensaje enviado con éxito!");
+                e.target.reset();
+                document.getElementById('formularioContacto').style.display = "none";
+                document.getElementById('estadoUsuario').innerText = "";
+            }
+        });
+    </script>
+</body>
+</html>
